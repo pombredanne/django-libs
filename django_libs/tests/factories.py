@@ -9,11 +9,60 @@ For example each app will need to create a user, therefore this module shall
 provide facilities for user generation.
 
 """
-from hashlib import md5
+from io import BytesIO
 
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 
+from PIL import Image
+from hashlib import md5
 import factory
+
+
+class HvadFactoryMixin(object):
+    """
+    Overrides ``_create`` and takes care of creating a translation.
+
+    """
+    @classmethod
+    def _create(cls, target_class, *args, **kwargs):
+        obj = target_class(*args, **kwargs)
+
+        # Factory boy and hvad behave a bit weird. When getting the object,
+        # obj.some_translatable_field is actually set although no tranlsation
+        # object exists, yet. We have to cache the translatable values ...
+        cached_values = {}
+        for field in obj._translated_field_names:
+            if field in ['id', 'master', 'language_code']:
+                continue
+            cached_values[field] = getattr(obj, field)
+
+        # ... because when calling translate, the translatable values will be
+        # lost on the obj ...
+        obj.translate(obj.language_code)
+        for field in obj._translated_field_names:
+            if field in ['id', 'master', 'language_code']:
+                continue
+            # ... so here we will put them back on the object, this time they
+            # will be saved on the translatable object.
+            setattr(obj, field, cached_values[field])
+
+        obj.save()
+        return obj
+
+
+class UploadedImageFactory(object):
+    """Creates an uploaded image for testing."""
+    def __new__(cls, **kwargs):
+        return cls._create_image(**kwargs)
+
+    @classmethod
+    def _create_image(self, image_format='JPEG', filename='img.jpg'):
+        thumb = Image.new('RGB', (100, 100), 'blue')
+        thumb_io = BytesIO()
+        thumb.save(thumb_io, format=image_format)
+        self._image = SimpleUploadedFile(filename, thumb_io.getvalue())
+        return self._image
 
 
 class SimpleTranslationMixin(object):
@@ -60,7 +109,7 @@ class SimpleTranslationMixin(object):
         return obj
 
 
-class UserFactory(factory.Factory):
+class UserFactory(factory.DjangoModelFactory):
     """
     Creates a new ``User`` object.
 

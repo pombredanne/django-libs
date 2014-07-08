@@ -5,7 +5,7 @@
 # ===========================================================================
 Sphinx
 django-mailer
-factory_boy<2.0.0
+factory_boy>2.0.0
 
 simple_translation
 
@@ -16,7 +16,7 @@ mock
 django-nose
 coverage
 django-coverage
-django-jasmine
-selenium
 ipdb
-flake8
+flake8>=2.1.0
+beautifulsoup4==4.3.2
+-e git+git://github.com/pinax/django-mailer.git@919805e25fc18b06487b25414d4e5d5e05a92108#egg=mailer

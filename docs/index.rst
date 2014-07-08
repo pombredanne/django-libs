@@ -19,11 +19,13 @@ Contents:
    context_processors
    decorators
    factories
-   javascript 
+   forms
+   javascript
    libs_tags
    loaders
    middlewares
    models_mixins
+   storage_support
    test_email_backend
    test_mixins
    testrunner

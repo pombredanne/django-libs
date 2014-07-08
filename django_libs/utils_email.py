@@ -2,11 +2,13 @@
 from django.template import RequestContext
 from django.template.loader import render_to_string
 
-from mailer import send_html_mail
+import mailer
+
+from .utils import html_to_plain_text
 
 
-def send_email(request, extra_context, subject_template, body_template_plain,
-               body_template, from_email, recipients):
+def send_email(request, extra_context, subject_template, body_template,
+               from_email, recipients, priority="medium"):
     """
     Sends an email based on templates for subject and body.
 
@@ -28,7 +30,7 @@ def send_email(request, extra_context, subject_template, body_template_plain,
         context = extra_context
     subject = render_to_string(subject_template, context)
     subject = ''.join(subject.splitlines())
-    message_plaintext = render_to_string(body_template_plain, context)
     message_html = render_to_string(body_template, context)
-    send_html_mail(subject, message_plaintext, message_html, from_email,
-                   recipients)
+    message_plaintext = html_to_plain_text(message_html)
+    mailer.send_html_mail(subject, message_plaintext, message_html, from_email,
+                          recipients, priority=priority)

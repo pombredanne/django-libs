@@ -1,6 +1,67 @@
 Template Tags
 =============
 
+add_form_widget_attr
+--------------------
+Adds widget attributes to a bound form field.
+
+This is helpful if you would like to add a certain class to all your forms
+(i.e. `form-control` to all form fields when you are using Bootstrap)::
+
+    {% load libs_tags %}
+    {% for field in form.fields %}
+        {% add_form_widget_attr field 'class' 'form-control' as field_ %}
+        {{ field_ }}
+    {% endfor %}
+
+The tag will check if the attr already exists and only append your value.
+If you would like to replace existing attrs, set `replace=1`::
+
+    {% add_form_widget_attr field 'class' 'form-control' replace=1 as field_ %}
+
+
+block_anyfilter
+---------------
+Turns any template filter into a blocktag.
+
+Usage::
+
+    {% load libs_tags %}
+    {% block_anyfilter django.template.defaultfilters.truncatewords_html 15 %}
+        // Something complex that generates html output
+    {% endblockanyfilter %}
+
+This is useful when you are working with django-cms' `render_placeholder` tag,
+for example. That tag is unfortunately not an assignment tag, therefore you
+can't really do anything with the output. Imagine you want to show a list of
+latest news and for each news a little excerpt based on the content
+placeholder. That placeholder could contain anything, like images and `h1` tags
+but you really just want to show the first ten words without images or any
+styles. Now you can do this:
+
+    {% block_anyfilter django.template.defaultfilters.truncatewords_html 15 %}
+        {% block_anyfilter django.template.defaultfilters.striptags %}
+            {% render_placeholder news_entry.content %}
+        {% endblockanyfilter %}
+    {% endblockanyfilter %}
+
+
+block_truncatewords_html
+------------------------
+Allows to truncate any block of content. Calls Django's ``truncatewords_html``
+internally.
+
+This is useful when rendering other tags that generate content,
+such as django-cms' ``render_placeholder`` tag, which is not available
+as an assignment tag::
+
+    {% load libs_tags %}
+    {% block_truncatewords_html 15 %}
+        {% render_placeholder object.placeholder %}
+    {% endblocktruncatewordshtml %}
+
+The first parameter is the number of words you would like to truncate after.
+
 
 calculate_dimensions
 --------------------
@@ -25,14 +86,86 @@ call
 ----
 
 ``call`` is an assignemnt tag that allows you to call any method of any object
-with args and kwargs, just like you love to do it in Python and hate not to be
-able to do it in Django templates.
+with args and kwargs, because you do it in Python all the time and you hate not
+to be able to do it in Django templates.
 
 Usage::
 
     {% load libs_tags %}
-    {% call myobj 'mymethod' arg1 arg2 kwarg1=kwarg1 as result %}
+    {% call myobj 'mymethod' myvar foobar=myvar2 as result %}
+    {% call myobj 'mydict' 'mykey' as result %}
+    {% call myobj 'myattribute' as result %}
     {{ result }}
+
+
+concatenate
+-----------
+
+Concatenates the given strings.
+
+Usage::
+
+    {% load libs_tags %}
+    {% concatenate "foo" "bar" as new_string %}
+    {% concatenate "foo" "bar" divider="_" as another_string %}
+
+The above would result in the strings "foobar" and "foo_bar".
+
+
+exclude
+-------
+
+``exclude`` is a filter tag that allows you to exclude one queryset from
+another.
+
+Usage::
+
+    {% load libs_tags %}
+    {% for clean_obj in qs|exclude:dirty_qs %}
+        {{ clean_obj }}
+    {% endfor %}
+
+
+get_content_type
+----------------
+
+``get_content_type`` is a simple template filter to return the content type of
+an object or to return one of the content type's fields.
+
+This might be very useful if you want to e.g. call a URL, which needs a content
+object as a keyword argument.
+
+In order to use it, just import the tag library and set the tag::
+
+    {% load libs_tags %}
+    <a href="{% url "review_content_object" content_type=user|get_content_type:'model' object_id=user.pk %}">Review this user!</a>
+
+As you can see, you can provide a field argument to return the relevant content
+type's field.
+
+
+get_form_field_type
+-------------------
+Returns the widget type of the given form field.
+
+This can be helpful if you want to render form fields in your own way
+(i.e. following Bootstrap standards).
+
+Usage::
+
+    {% load libs_tags %}
+    {% for field in form %}
+        {% get_form_field_type field as field_type %}
+        {% if "CheckboxInput" in field_type %}
+            <div class="checkbox">
+                <label>
+                    // render input here
+                </label>
+            </div>
+        {% else %}
+            {{ field }}
+        {% endif %}
+    {% endfor %}
 
 
 get_range
@@ -45,6 +178,41 @@ iterate over ranges in your templates::
     {% for item in 5|get_range %}
         Item number {{ item }}
     {% endfor %}
+
+You can also calculate the difference between your value and a max value.
+This is useful if you want to fill up empty space with items so that the
+total amount of items is always ``max_num``::
+
+    {% load libs_tags %}
+    {% for item in object_list.count|get_range %}
+        // render the actual items
+    {% endfor %}
+    {% for item in object_list.count|get_range:10 %}
+        // render the placeholder items to fill up the space
+    {% endfor %}
+
+get_range_around
+----------------
+Returns a range of numbers around the given number.
+
+This is useful for pagination, where you might want to show something
+like this::
+
+    << < ... 4 5 (6) 7 8 .. > >>
+
+In this example `6` would be the current page and we show 2 items left and
+right of that page.
+
+Usage::
+
+    {% load libs_tags %}
+    {% get_range_around page_obj.paginator.num_pages page_obj.number 2 as pages %}
+
+The parameters are:
+
+1. range_amount: Number of total items in your range (1 indexed)
+2. The item around which the result should be centered (1 indexed)
+3. Number of items to show left and right from the current item.
 
 
 get_verbose
@@ -72,6 +240,33 @@ In order to use it, just import the tag library and set the tag::
         </li>
     </ul>
 
+
+get_query_params
+----------------
+
+Allows to change (or add) one of the URL get parameter while keeping all the
+others.
+
+Usage::
+
+    {% load libs_tags %}
+    {% get_query_params request "page" page_obj.next_page_number as query %}
+    <a href="?{{ query }}">Next</a>
+
+You can also pass in several pairs of keys and values::
+
+    {% get_query_params request "page" 1 "foobar" 2 as query %}
+
+You often need this when you have a paginated set of objects with filters.
+
+Your url would look something like ``/?region=1&gender=m``. Your paginator
+needs to create links with ``&page=2`` in them but you must keep the
+filter values when switching pages.
+
+If you want to remove a special parameter, you can do that by setting it's
+value to ``!remove``::
+
+    {% get_query_params request "page" 1 "foobar" "!remove" as query %}
 
 load_context
 ------------
@@ -148,10 +343,96 @@ Usage::
 or (if you don't want to use the ``anonymizeIp`` setting)::
 
     {% load libs_tags %}
+    ...
+    <head>
+    ...
     {% render_analytics_code False %}
+    </head>
 
 If you would like to override the template used by the tag, please use
 ``django_libs/analytics.html``.
+
+
+render_analytics2_code
+----------------------
+
+The same as ``render_analytics_code`` but uses the new syntax and always uses
+anonymize IP.
+
+Usage::
+
+    {% load libs_tags %}
+    ...
+    <head>
+    ...
+    {% render_analytics2_code %}
+    </head>
+
+
+save
+----
+
+``save`` allows you to save any variable to the context. This can be useful
+when you have a template where different sections are rendered
+depending on complex conditions. If you want to render `<hr />` tags between
+those sections, it can be quite difficult to figure out when to render the
+divider and when not.
+
+Usage::
+
+    {% load libs_tags %}
+    ...
+    {% if complex_condition1 %}
+        // Render block 1
+        {% save "NEEDS_HR" 1 %}
+    {% endif %}
+
+    {% if complex_condition2 %}
+        {% if NEEDS_HR %}
+            <hr />
+            {% save "NEEDS_HR" 0 %}
+        {% endif %}
+        // Render block 2
+        {% save "NEEDS_HR" 1 %}
+    {% endif %}
+
+When you have to render lots of divicers, the above example can become more
+elegant when you replace the `if NEEDS_HR` block with::
+
+    {% include "django_libs/partials/dynamic_hr.html" %}
+
+
+sum
+---
+Adds the given value to the total value currently held in `key`.
+
+Use the multiplier if you want to turn a positive value into a negative
+and actually substract from the current total sum.
+
+Usage::
+
+    {% sum "MY_TOTAL" 42 -1 %}
+    {{ MY_TOTAL }}
+
+
+set_context
+-----------
+
+NOTE: It turns out that this implementation only saves to the current
+template's context. If you use this in a sub-template, it will not be available
+in the parent template. Use our ``save`` tag for manipulating the global
+RequestContext.
+
+``set_context`` allows you to put any variable into the context. This can be
+useful when you are creating prototype templates where you don't have the full
+template context, yet but you already know that certain variables will be
+available later::
+
+    {% load libs_tags %}
+    {% set_context '/dummy-url/' as contact_url %}
+    {% blocktrans with contact_url=contact_url %}
+    Please don't hesitate to <a href="{{ contact_url }}">contact us</a>.
+    {% endblocktrans %}
 
 
 verbatim
